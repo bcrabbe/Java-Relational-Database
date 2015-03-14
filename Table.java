@@ -6,43 +6,57 @@ class Table
     List<Attribute> tableHeading;// attribute names, types, constraints etc
     Set<Tuple> tableBody;// a set of tuples
     
-    Table(String name)
+    
+    Table(String name) throws Exception
     {
-        this.name = name;
+        setNameIfValid(name);
         tableHeading = new ArrayList<Attribute>();//columns
         tableBody = new LinkedHashSet<Tuple>();//rows
     }
 
-    Table(String name, List<String> fieldNames)
+    Table(String name, List<String> fieldNames) throws Exception
     {
-        this.name = name;
+        setNameIfValid(name);
         tableHeading = new ArrayList<Attribute>();
         tableBody = new LinkedHashSet<Tuple>();
         for(String newField: fieldNames) {
-            try {
-                addAttribute(newField);
-            } catch(Exception e) {
-                System.out.println(e.getMessage());
-            }
+            addAttribute(newField);
         }
+    }
+    
+    private void setNameIfValid(String name) throws Exception
+    {
+        if(isValidName(name)) {
+            this.name = name;
+        }
+    }
+    
+    static boolean isValidName(String name) throws Exception
+    {
+        if( name.contains(FileHandler.columnDelim) ||
+           name.contains(FileHandler.newLineDelim) ) {
+            throw new Exception(name + " is invalid. names cannot contain any of: " +
+                                FileHandler.columnDelim + FileHandler.newLineDelim);
+        }
+        else return true;
     }
     
     public String toString()
     {
-        String tableString = name + "||\n";
+        String tableString = name + "||";
         try {
             List<String> attNames = getAttributeNames();
             for(String column: attNames) {
-                tableString.concat(column);
-                tableString.concat(" | ");
+                tableString = tableString.concat(column);
+                tableString = tableString.concat("|");
             }
-            tableString.concat(" ||\n");
+            tableString = tableString.concat("|");
             for(Tuple row: tableBody) {
                 for(String attName: attNames) {
-                    tableString.concat(row.getAttributeValue(attName));
-                    tableString.concat(" | ");
+                    tableString = tableString.concat(row.getAttributeValue(attName));
+                    tableString = tableString.concat("|");
                 }
-                tableString.concat(" ||\n");
+                tableString =  tableString.concat("|");
             }
         } catch(Exception e) {
             System.out.println(e.getMessage());
@@ -63,13 +77,25 @@ class Table
     
     void addAttribute(String attributeName) throws Exception
     {
-        if(attributeExists(attributeName)){
-            throw new Exception("attribute " + attributeName + " already exists");
+        if(isValidAttribute(attributeName)) {
+            Attribute newAtt = new Attribute(attributeName);
+            tableHeading.add(newAtt);
         }
-        Attribute newAtt = new Attribute(attributeName);
-        tableHeading.add(newAtt);
     }
-
+    
+    private boolean isValidAttribute(String attributeName) throws Exception
+    {
+        if(isValidName(attributeName)) {
+            if(attributeExists(attributeName)) {
+                throw new Exception("attribute named " + attributeName + " already exists in table");
+            }
+            else {
+                return true;
+            }
+        }
+        return false;
+    }
+    
     int countColumns()
     {
        return tableHeading.size();
@@ -80,7 +106,7 @@ class Table
         return tableBody.size();
     }
 
-    List<String> getAttributeNames()
+    public List<String> getAttributeNames()
     {
         List<String> attributeNames = new ArrayList<String>();
         for(Attribute a: tableHeading) {
@@ -89,16 +115,19 @@ class Table
         return attributeNames;
     }
 
-    void editAttributeName(String oldName, String newName) throws Exception
+    public void editAttributeName(String oldName, String newName) throws Exception
     {
-        if(attributeExists(oldName)) {
-            Attribute editMyName = getAttributeFromName(oldName);
-            editMyName.name = newName;
+        if(isValidName(newName)) {
+            if(attributeExists(oldName)) {
+                Attribute editMyName = getAttributeFromName(oldName);
+                editMyName.name = newName;
+            }
+            else {
+                throw new Exception("Could not edit attribute name. No attribute named " +
+                                    oldName + " in table.");
+            }
         }
-        else {
-            throw new Exception("Could not edit attribute name. No attribute named " +
-                                oldName + " in table.");
-        }
+       
     }
 
     private Attribute getAttributeFromName(String name) throws Exception
@@ -111,6 +140,7 @@ class Table
         throw new Exception("Could not get attribute. None named " + name + " in table.");
     }
 
+    
     void addTuple(String... values) throws Exception
     {
         if(values.length != tableHeading.size()) {
@@ -145,21 +175,27 @@ class Table
         }
     }
     
+    public int getColumnWidth(String attributeName) throws Exception
+    {
+        getAttributeFromName(attributeName);
+        
+    }
+    
     static void is(Object x, Object y)
     {
-        System.out.println("testing " + x.toString() + " = " + y.toString() );
-
+        System.out.print("testing " + x.toString() + " = " + y.toString() );
+        
         if (x==y || (x != null && x.equals(y)) ) {
-            System.out.println("pass");
+            System.out.println("...pass");
             return;
         }
-        System.out.println("fail");
+        System.out.print("...fail");
     }
-
+    
     public static void main(String[] args)
     {
-        Table t = new Table("testTable");
         try {
+            Table t = new Table("testTable");
             t.addAttribute("Attribute1");
             is( t.attributeExists("Attribute1"), true);
             is( t.getAttributeFromName("Attribute1"), t.tableHeading.iterator().next() );
@@ -178,12 +214,12 @@ class Table
         attributeNames2.add("Attribute1");
         attributeNames2.add("Attribute2");
         attributeNames2.add("Attribute3");
-        Table t2 = new Table("testTable2",attributeNames2);
-        is( t2.attributeExists("Attribute1"), true);
-        is( t2.attributeExists("Attribute2"), true);
-        is( t2.attributeExists("Attribute3"), true);
-        is(t2.countColumns(),3);
         try {
+            Table t2 = new Table("testTable2",attributeNames2);
+            is( t2.attributeExists("Attribute1"), true);
+            is( t2.attributeExists("Attribute2"), true);
+            is( t2.attributeExists("Attribute3"), true);
+            is(t2.countColumns(),3);
             t2.addTuple("value1","value1","value1");
             t2.addTuple("value2","value2","value2");
             System.out.println(t2.getAttributeNames());

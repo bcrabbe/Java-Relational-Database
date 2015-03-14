@@ -17,7 +17,6 @@ class Tuple
         }
     }
 
-
     Tuple()
     {
         attributes = new ArrayList<AttributeValue>();
@@ -28,6 +27,7 @@ class Tuple
         attributes = new ArrayList<AttributeValue>();
         for(int i=0; i<values.size(); ++i) {
             AttributeValue newAttribute = new AttributeValue(tableHeading.get(i), values.get(i));
+            attributes.add(newAttribute);
         }
     }
 
