@@ -180,7 +180,297 @@ class Record
 \end{lstlisting}
 
 \section{Tables}
+I decided that the main data on the attribute names, types etc should be held by the table since every row is the same, so I split the Attribute class into two: Attribute and AttributeValue. Attributes hold the name (and other things in the future), AttributeValues, which are an inner class to Tuple (I renamed Record to fit better with the relational model) hold the values and a reference to the Attribute class it belongs to. This way the values are still directly searchable by attribute name, but the name is stored in only 1 place. 
+
+I also got rid of my custom exception. It wouldn't let me pass multiple string types to store as a message, and it didn't seem to gain much to be worth writing a bunch more constructors for.
 
 
 
+
+\begin{lstlisting}
+import java.util.*;
+
+class Table
+{
+    String name;
+    List<Attribute> tableHeading;// attribute names, types, constraints etc
+    Set<Tuple> tableBody;// a set of tuples
+    
+    Table(String name)
+    {
+        this.name = name;
+        tableHeading = new ArrayList<Attribute>();//columns
+        tableBody = new LinkedHashSet<Tuple>();//rows
+    }
+
+    Table(String name, List<String> fieldNames)
+    {
+        this.name = name;
+        tableHeading = new ArrayList<Attribute>();
+        tableBody = new LinkedHashSet<Tuple>();
+        for(String newField: fieldNames) {
+            try {
+                addAttribute(newField);
+            } catch(Exception e) {
+                System.out.println(e.getMessage());
+            }
+        }
+    }
+    
+    boolean attributeExists(String attributeName)
+    {
+        for(Attribute a: tableHeading) {
+            if(a.name==attributeName) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    void addAttribute(String attributeName) throws Exception
+    {
+        if(attributeExists(attributeName)){
+            throw new Exception("attribute " + attributeName + " already exists");
+        }
+        Attribute newAtt = new Attribute(attributeName);
+        tableHeading.add(newAtt);
+    }
+
+    int countFields()
+    {
+       return tableHeading.size();
+    }
+    
+    int countRows()
+    {
+        return tableBody.size();
+    }
+
+    List<String> getFieldNames()
+    {
+        List<String> fieldNames = new ArrayList<String>();
+        for(Attribute field: tableHeading) {
+            fieldNames.add(field.name);
+        }
+        return fieldNames;
+    }
+
+    void editAttributeName(String oldName, String newName) throws Exception
+    {
+        if(attributeExists(oldName)) {
+            Attribute editMyName = getAttributeFromName(oldName);
+            editMyName.name = newName;
+        }
+        else {
+            throw new Exception("Could not edit attribute name. No attribute named " +
+                                oldName + " in table.");
+        }
+    }
+
+    private Attribute getAttributeFromName(String name) throws Exception
+    {
+        for(Attribute field: tableHeading) {
+            if(field.name==name) {
+                return field;
+            }
+        }
+        throw new Exception("Could not get attribute. None named " + name + " in table.");
+    }
+
+    void addTuple(String... values) throws Exception
+    {
+        if(values.length != tableHeading.size()) {
+            throw new Exception("addTuple() for Table " + name + " expects " +
+                                    tableHeading.size() + " data values. It received " +
+                                    values.length);
+        }
+        else {
+            Tuple newTuple = new Tuple(tableHeading, Arrays.asList(values));
+            tableBody.add(newTuple);
+        }
+    }
+    
+    void deleteTuple(String attributeName, String value) throws Exception
+    {
+        if(attributeExists(attributeName)) {
+            Attribute attributeToDelete = getAttributeFromName(attributeName);
+            try {
+                for(Tuple row: tableBody) {
+                    if(row.getAttributeValue(attributeName)==value) {
+                        tableBody.remove(row);
+                        return;
+                    }
+                }
+            } catch(Exception e) {
+                throw new Exception("deleteTuple() there are no tuples where " +
+                                    attributeName + " has a value of " + value );
+            }
+        } else {
+            throw new Exception("deleteTuple()  No attribute named " + attributeName +
+                                " in table " + name);
+        }
+    }
+
+    static void is(Object x, Object y)
+    {
+        if (x == y) return;
+        if (x != null && x.equals(y)) return;
+        throw new Error("Error:\n" + x + "\n" + y);
+    }
+
+    void testTable()
+    {
+        
+    }
+
+    public static void main(String[] args)
+    {
+        Table t = new Table("testTable");
+        t.testTable();
+    }
+
+
+}
+
+\end{lstlisting}
+
+\begin{lstlisting}
+import java.util.*;
+
+
+class Tuple
+{
+   List<AttributeValue> attributes;
+
+   class AttributeValue
+   {
+        String value;
+        Attribute type;
+
+        AttributeValue(Attribute attributeType, String value)
+        {
+           this.value = value;
+           this.type = attributeType;
+        }
+    }
+
+
+    Tuple()
+    {
+        attributes = new ArrayList<AttributeValue>();
+    }
+
+    Tuple( List<Attribute> tableHeading, List<String> values)
+    {
+        attributes = new ArrayList<AttributeValue>();
+        for(int i=0; i<values.size(); ++i) {
+            AttributeValue newAttribute = new AttributeValue(tableHeading.get(i), values.get(i));
+        }
+    }
+
+    private AttributeValue getAttributeValueObjFromName(String attributeName) throws Exception
+    {
+        for(AttributeValue attribute: attributes) {
+            if(attribute.type.name==attributeName) {
+                return attribute;
+            }
+        }
+        throw new Exception("No attribute named " + attributeName + " in tuple." );
+    }
+    
+    boolean attributeExists(String name)
+    {
+        for(AttributeValue attribute: attributes) {
+            if(attribute.type.name==name) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    String getAttributeValue(String attributeName) throws Exception
+    {
+        AttributeValue attribute =  getAttributeValueObjFromName(attributeName);
+        return attribute.value;
+    }
+
+
+    void setAttributeValue(String attributeName, String attributeValue) throws Exception
+    {
+        AttributeValue attribute =  getAttributeValueObjFromName(attributeName);
+        attribute.value=attributeValue;
+    }
+
+    int countAttributes()
+    {
+        return attributes.size();
+    }
+
+    void addAttribute(Attribute attributeType, String value) throws Exception
+    {
+        if(attributeExists(attributeType.name)) {
+            throw new Exception("addAttribute() attribute named " + attributeType.name +
+                                " already exists in tuple.");
+        }
+        AttributeValue newAttribute = new AttributeValue(attributeType,value);
+        attributes.add(newAttribute);
+    }
+    static void is(Object x, Object y)
+    {
+        if (x==y || (x != null && x.equals(y)) ) {
+            System.out.println("pass");
+            return;
+        }
+        System.out.println("fail");
+        throw new Error("Error:\n" + x + "\n" + y);
+    }
+
+    public static void main(String[] args)
+    {
+        Tuple row = new Tuple();
+        row.testTuple();
+    }
+
+    void testTuple()
+    {
+        try {
+            Attribute newAttribute = new Attribute("test");
+            addAttribute(newAttribute,"value1");
+            is(1,countAttributes());
+            is("value1",getAttributeValue("test"));
+            setAttributeValue("test", "value2");
+            is("value2",getAttributeValue("test"));
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+        }
+    }
+}
+
+\end{lstlisting}
+
+\begin{lstlisting}
+import java.util.*;
+
+class Attribute
+{
+    String name;
+    //      String type;
+    
+    Attribute(String name)
+    {
+        this.name = name;
+        //   this.value = type;
+    }
+}
+\end{lstlisting}
 \end{document}
+
+
+
+
+
+
+
+
+
+
