@@ -30,7 +30,24 @@ class Tuple
             attributes.add(newAttribute);
         }
     }
-
+    
+//    String getAllValuesOfTuple()
+//    {
+//        String allValuesOfTuple = new String();
+//        for(AttributeValue av: attributes) {
+//            allValuesOfTuple += av.value;
+//        }
+//        return allValuesOfTuple;
+//    }
+    List<String> getAllValuesOfTuple()
+    {
+        List<String> allValuesOfTuple = new ArrayList<String>();
+        for(AttributeValue av: attributes) {
+            allValuesOfTuple.add(av.value);
+        }
+        return allValuesOfTuple;
+    }
+    
     private AttributeValue getAttributeValueObjFromName(String attributeName) throws Exception
     {
         for(AttributeValue attribute: attributes) {
@@ -77,6 +94,15 @@ class Tuple
         }
         AttributeValue newAttribute = new AttributeValue(attributeType,value);
         attributes.add(newAttribute);
+    }
+    
+    List<String> toListOfStrings()
+    {
+        List<String> rowString = new ArrayList<String>();
+        for(AttributeValue av: attributes) {
+            rowString.add(av.value);
+        }
+        return rowString;
     }
     
     static void is(Object x, Object y)

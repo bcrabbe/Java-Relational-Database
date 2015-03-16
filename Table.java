@@ -5,22 +5,39 @@ class Table
     String name;
     List<Attribute> tableHeading;// attribute names, types, constraints etc
     Set<Tuple> tableBody;// a set of tuples
-    
-    
-    Table(String name) throws Exception
+    List<Attribute> primaryKey;
+
+    Table(String saveString) throws Exception
     {
-        setNameIfValid(name);
-        tableHeading = new ArrayList<Attribute>();//columns
-        tableBody = new LinkedHashSet<Tuple>();//rows
+        this(saveString.split(FileHandler.newLineDelim)[0],//gets table name from saveString then the table heading:
+                      Arrays.asList(saveString.split(FileHandler.newLineDelim)[1].split(FileHandler.columnDelim)));
+        
+        String[] tableRowStrings = saveString.split(FileHandler.newLineDelim);
+        try {
+            for(int i=2; i<tableRowStrings.length; ++i) {
+                addTuple(tableRowStrings[i].split(FileHandler.columnDelim));
+            }
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            throw new Exception("Could not load table");
+        }
     }
 
-    Table(String name, List<String> fieldNames) throws Exception
+    Table(String name, List<String> attributeNames) throws Exception
     {
-        setNameIfValid(name);
-        tableHeading = new ArrayList<Attribute>();
-        tableBody = new LinkedHashSet<Tuple>();
-        for(String newField: fieldNames) {
-            addAttribute(newField);
+        try {
+            setNameIfValid(name);
+            tableHeading = new ArrayList<Attribute>();
+            tableBody = new LinkedHashSet<Tuple>();
+            for(String attributeName: attributeNames) {
+                addAttribute(attributeName);
+            }
+            String[] attributeNamesArray = attributeNames.toArray(new String[0]);
+            System.out.print(attributeNamesArray.toString());//DODGEY
+            setPrimaryKey(attributeNamesArray);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            throw new Exception("Could not create table");
         }
     }
     
@@ -41,7 +58,31 @@ class Table
         else return true;
     }
     
-    public String toString()
+    void setPrimaryKey(String... attributeNames) throws Exception
+    {
+        if( countRows()==0 ) {
+            throw new Exception("There are no attributes.");
+        }
+        if( !isAttributeSetUnique(attributeNames) ) {
+            throw new Exception("Suggested PK is not unique. Cannot set.");
+        }
+      
+        else {
+            for(String attributeName: attributeNames) {
+                primaryKey.add(getAttributeFromName(attributeName));
+            }
+        }
+    }
+    
+    private boolean isAttributeSetUnique(String... attributeNames) throws Exception
+    {
+        List<String> allValues = getAllValuesOfAttribute(attributeNames);
+        Set<String> allValuesSet = new HashSet<String>(allValues);
+        if( allValuesSet.size() < allValues.size() ) return false;
+        else return true;
+    }
+    
+    String toSaveString()
     {
         String tableString = name + "||";
         try {
@@ -87,7 +128,8 @@ class Table
     {
         if(isValidName(attributeName)) {
             if(attributeExists(attributeName)) {
-                throw new Exception("attribute named " + attributeName + " already exists in table");
+                throw new Exception("attribute named " + attributeName +
+                                    " already exists in table");
             }
             else {
                 return true;
@@ -106,7 +148,7 @@ class Table
         return tableBody.size();
     }
 
-    public List<String> getAttributeNames()
+    List<String> getAttributeNames()
     {
         List<String> attributeNames = new ArrayList<String>();
         for(Attribute a: tableHeading) {
@@ -115,7 +157,7 @@ class Table
         return attributeNames;
     }
 
-    public void editAttributeName(String oldName, String newName) throws Exception
+    void editAttributeName(String oldName, String newName) throws Exception
     {
         if(isValidName(newName)) {
             if(attributeExists(oldName)) {
@@ -139,7 +181,18 @@ class Table
         }
         throw new Exception("Could not get attribute. None named " + name + " in table.");
     }
-
+    
+    private boolean doesTupleExist(String... values)
+    {
+        List<String> newTupleValues = Arrays.asList(values);
+        for(Tuple row: tableBody) {
+            List<String> rowValues = row.getAllValuesOfTuple();
+            if(rowValues.size() == newTupleValues.size() && rowValues.containsAll(newTupleValues)) {
+                return true;
+            }
+        }
+        return false;
+    }
     
     void addTuple(String... values) throws Exception
     {
@@ -156,29 +209,136 @@ class Table
     
     void deleteTuple(String attributeName, String value) throws Exception
     {
-        if(attributeExists(attributeName)) {
-            Attribute attributeToDelete = getAttributeFromName(attributeName);
-            try {
-                for(Tuple row: tableBody) {
-                    if(row.getAttributeValue(attributeName)==value) {
-                        tableBody.remove(row);
-                        return;
-                    }
-                }
-            } catch(Exception e) {
-                throw new Exception("deleteTuple() there are no tuples where " +
-                                    attributeName + " has a value of " + value );
-            }
-        } else {
-            throw new Exception("deleteTuple()  No attribute named " + attributeName +
-                                " in table " + name);
-        }
+        tableBody.remove(getTupleFromSelect(attributeName,value));
     }
     
-    public int getColumnWidth(String attributeName) throws Exception
+    private Tuple getTupleFromSelect(String selectAttributeName, String selectValue) throws Exception
     {
-        getAttributeFromName(attributeName);
+        Attribute selectedAttribute = getAttributeFromName(selectAttributeName);
+        for(Tuple row: tableBody) {
+            if(row.getAttributeValue(selectedAttribute.name)==selectValue) {
+                return row;
+            }
+        }
+        throw new Exception("There are no tuples where " +
+                                selectAttributeName + " has a value of " + selectValue );
+    }
+    
+
+    
+    private List<String> getAllValuesOfAttribute(String... attributeNames) throws Exception
+    {
+        List<String> allValues = new ArrayList<String>();
+        for(Tuple row: tableBody) {
+            String combinedValue = "";
+            for(String attributeName: attributeNames) {
+                combinedValue += row.getAttributeValue(attributeName);
+            }
+            allValues.add(combinedValue);
+        }
+        return allValues;
+    }
+    
+    
+    
+    // printing functions
+    
+    private int spacesBetweenCols = 4;
+    List<String> presentTableForPrinting()
+    {
+        List<String> presentedTable = new ArrayList<String>();
+        List<String> headings = getAttributeNames();
+        List<Integer> headingWidths = getColumnWidths(headings);
         
+        presentedTable.add(name);
+        presentedTable.add("\n\n\n");
+        
+        presentedTable.add(presentTableRow(headings, headingWidths));
+        presentedTable.add( makeStringOfChar( getTableWidth(headingWidths), '-') + "\n" );
+        
+        for(Tuple row: tableBody) {
+            List<String> rowString = row.toListOfStrings();
+            presentedTable.add(presentTableRow(rowString, headingWidths));
+        }
+        return presentedTable;
+    }
+    
+    private int getTableWidth(List<Integer> headingWidths)
+    {
+        int sum = 0;
+        for(int headingWidth : headingWidths) {
+            sum += headingWidth;
+        }
+        sum +=spacesBetweenCols*countColumns();
+        return sum;
+    }
+    
+    private String presentTableRow(List<String> rowStrings, List<Integer> headingWidths)
+    {
+        String presentedRow = "";
+        for(int i=0; i<rowStrings.size(); ++i)
+        {
+            int strWidth = getWidthOfString(rowStrings.get(i));
+            int spacesNeeded = headingWidths.get(i) - strWidth;
+            presentedRow = presentedRow.concat(rowStrings.get(i));
+            presentedRow = presentedRow.concat(makeStringOfChar(spacesNeeded+spacesBetweenCols, ' '));
+        }
+        presentedRow += '\n';
+        return presentedRow;
+    }
+    
+    private String makeStringOfChar(int number, char c)
+    {
+        String s = "";
+        for(int i=0; i<number; ++i)
+        {
+            s = s + c;
+        }
+        return s;
+    }
+    
+    private List<Integer> getColumnWidths(List<String> headings)
+    {
+        List<Integer> headingWidths = new ArrayList<Integer>();
+        for(String heading: headings) {
+            headingWidths.add(getWidthOfString(heading));
+        }
+        return headingWidths;
+    }
+    
+    private int getColumnWidth(String attributeName) throws Exception
+    {
+        Attribute a = getAttributeFromName(attributeName);
+        int maxwidth = getWidthOfString(attributeName);
+        for(Tuple row: tableBody) {
+            String valueString = row.getAttributeValue(attributeName);
+            int width = getWidthOfString(valueString);
+            maxwidth = width > maxwidth ? width : maxwidth;
+        }
+        return maxwidth;
+    }
+
+    static int getWidthOfString(String str)
+    {
+        int width=0, maxwidth=0;
+        for( char c: str.toCharArray() ) {
+            if(c=='\n' || c=='\r') {
+                maxwidth = width > maxwidth ? width : maxwidth;
+                width = 0;
+            }
+            else {
+                ++width;
+            }
+        }
+        maxwidth = width > maxwidth ? width : maxwidth;
+        return maxwidth;
+    }
+    
+    void testGetWidthOfString()
+    {
+        is(getWidthOfString("123456"),6);
+        is(getWidthOfString("123\n123456\n123"),6);
+        is(getWidthOfString("123\n\r123456\n\r123456"),6);
     }
     
     static void is(Object x, Object y)
@@ -189,46 +349,96 @@ class Table
             System.out.println("...pass");
             return;
         }
-        System.out.print("...fail");
+        System.out.println("...fail");
+    }
+    
+    void viewTable()
+    {
+        List<String> table = presentTableForPrinting();
+        for(String s: table) {
+            System.out.print(s);
+        }
+    }
+    
+    void testCreateTable()
+    {
+        try {
+            viewTable();
+            is( attributeExists("Attribute1"), true);
+            is( attributeExists("Attribute2"), true);
+            is( attributeExists("Attribute3"), true);
+            is( countColumns(), 3);
+            is(toSaveString(),
+               "testTable2||Attribute1|Attribute2|Attribute3||value1|value1|value1||value2|value2|value2||");
+            addTuple("value3","value3","value3");
+            addTuple("value4","value4","value4");
+            is(countRows(),4);
+            is(primaryKey.containsAll(tableHeading),true );
+        } catch(Exception e) {
+            System.out.println(e.getMessage());
+        }
+
+    }
+    void testSetPrimaryKey()
+    {   try {
+            setPrimaryKey("Attribute1");
+            is(primaryKey.get(0), getAttributeFromName("Attribute1"));
+            setPrimaryKey("Attribute2");
+            is(primaryKey.get(0), getAttributeFromName("Attribute1"));
+            List<String> compoundPK = new ArrayList<String>();
+            compoundPK.add("Attribute2");
+            compoundPK.add("Attribute3");
+            setPrimaryKey("Attribute2","Attribute3");
+            is(primaryKey.containsAll(compoundPK), true);
+
+        } catch(Exception e) {
+            System.out.println(e.getMessage());
+        }
     }
     
     public static void main(String[] args)
     {
         try {
-            Table t = new Table("testTable");
-            t.addAttribute("Attribute1");
-            is( t.attributeExists("Attribute1"), true);
-            is( t.getAttributeFromName("Attribute1"), t.tableHeading.iterator().next() );
-            List<String> attributeNames = new ArrayList<String>(1);
-            attributeNames.add("Attribute1");
-            is(t.getAttributeNames(),attributeNames);
-            t.addTuple("value1");
-            is(t.countRows(),1);
-            //t.deleteTuple("Attribute1","value1");
-           // is(t.countRows(),0);
+            Table t2 = new Table(FileHandler.readFile("./saves/test.txt"));
+            t2.testCreateTable();
+            t2.testGetWidthOfString();
+            t2.testSetPrimaryKey();
         } catch(Exception e) {
             System.out.println(e.getMessage());
-            throw new Error();
-        }
-        List<String> attributeNames2 = new ArrayList<String>(3);
-        attributeNames2.add("Attribute1");
-        attributeNames2.add("Attribute2");
-        attributeNames2.add("Attribute3");
-        try {
-            Table t2 = new Table("testTable2",attributeNames2);
-            is( t2.attributeExists("Attribute1"), true);
-            is( t2.attributeExists("Attribute2"), true);
-            is( t2.attributeExists("Attribute3"), true);
-            is(t2.countColumns(),3);
-            t2.addTuple("value1","value1","value1");
-            t2.addTuple("value2","value2","value2");
-            System.out.println(t2.getAttributeNames());
-            System.out.print(t2.toString());
-        } catch(Exception e) {
-            System.out.println(e.getMessage());
-            throw new Error();
         }
     }
 
 
 }
+
+
+/*
+ if( isAttributeSetNotNull(AttributeName) ) {
+ } else {
+ throw new Exception(attributeName + " has null values. Cannot set PK.");
+ }
+ private boolean isAttributeSetNotNull(String... attributeNames) throws Exception
+ {
+ 
+ for(String attributeName: attributeNames) {
+ List<String> allValues = getAllValuesOfAttribute(attributeName);
+ for(String val: allValues) {
+ if( val.size() == 0 || val.toLowerCase() == "null") {
+ return false;
+ }
+ }
+ return true;
+ }
+ return true;
+ }
+ 
+ private boolean isAttributeNotNull(String attributeName) throws Exception
+ {
+ List<String> allValues = getAllValuesOfAttribute(attributeName);
+ for(String val: allValues) {
+ if( val.size() == 0 || val.toLowerCase() == "null") {
+ return false;
+ }
+ }
+ return true;
+ }*/

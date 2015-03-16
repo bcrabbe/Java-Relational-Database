@@ -1,7 +1,4 @@
 
-//import java.util.*;
-//import java.nio.file;
-//import java.nio.charset.StandardCharsets;
 
 import static java.nio.file.StandardOpenOption.*;
 import java.nio.*;
@@ -15,11 +12,6 @@ import java.util.regex.Pattern;
 
 class FileHandler
 {
-    public enum Format
-    {
-        TXT, TEX
-    }
-    
     final static private String encoding = "UTF-8";
     final static String newLineDelim = Pattern.quote("||");
     final static String columnDelim = Pattern.quote("|");
@@ -29,25 +21,24 @@ class FileHandler
         
     }
     
-    public exportTable(Table t, Format ext, String fpath)
+    void exportTableAsTxt(Table t, String fpath)
     {
-        if(ext==TXT) {
-            exportTableAsTxt(t, fpath);
-        }
-        else if(ext==TEX)
-        {
-            
-        }
+        List<String> rowStrings = t.presentTableForPrinting();
+        stringListToFile(rowStrings, fpath);
     }
     
-    private void exportTableAsTxt(Table t, String fpath)
+    private void stringListToFile(List<String> strList, String fpath)
     {
-        
+        String combined = "";
+        for(String str: strList) {
+            combined = combined.concat(str);
+        }
+        stringToFile(combined,fpath);
     }
     
-    public void saveTableToFile(Table t)
+    void saveTableToFile(Table t, String fpath)
     {
-        stringToFile(t.toString());
+        stringToFile( t.toSaveString(), fpath);
     }
     
     private void stringToFile(String s, String fpath)
@@ -84,8 +75,6 @@ class FileHandler
             String tableString = new String(readFile(fpath));
             String[] tableRowStrings = tableString.split(newLineDelim);
             String[] tableHeadings = tableRowStrings[1].split(columnDelim);
-           // List<String> tableHeadingsTrimed = trimWhiteSpace(tableHeadings);
-            
             Table newTable = new Table(tableRowStrings[0],//[0] has table name
                                        Arrays.asList(tableHeadings));
             for(int i=2; i<tableRowStrings.length; ++i) {
@@ -126,8 +115,8 @@ class FileHandler
             Table t2 = new Table("testTable2",attributeNames2);
             t2.addTuple("value1","value1","value1");
             t2.addTuple("value2","value2","value2");
-            String tableString = t2.toString();
-            saveTableToFile(tableString,"./saves/test.txt");
+            String tableString = t2.toSaveString();
+            saveTableToFile(t2,"./saves/test.txt");
         } catch(Exception e) {
             System.out.println(e.getMessage());
             throw new Error();
@@ -140,13 +129,30 @@ class FileHandler
             testSaveTable();//make sure we have a file there
             Table testT = loadTableFromFile("./saves/test.txt");
             String stringInFile = readFile("./saves/test.txt");
-            is(testT.toString(),stringInFile);
+            is(testT.toSaveString(),stringInFile);
         } catch(Exception e) {
             System.out.println(e.getMessage());
             throw new Error();
         }
     }
 
+    void testExportTableAsTxt()
+    {
+        List<String> attributeNames2 = new ArrayList<String>(3);
+        attributeNames2.add("Attribute1");
+        attributeNames2.add("Att2");
+        attributeNames2.add("A3");
+        try {
+            Table t2 = new Table("testTable2",attributeNames2);
+            t2.addTuple("value1","val1","v1");
+            t2.addTuple("value2","val2","v2");
+            exportTableAsTxt(t2, "./exports/test.txt");
+        } catch(Exception e) {
+            System.out.println(e.getMessage());
+            throw new Error();
+        }
+    }
+    
     static void is(Object x, Object y)
     {
         System.out.print("testing " + x.toString() + " = " + y.toString() );
@@ -164,6 +170,7 @@ class FileHandler
         fh.testSaveTable();
         fh.testReadFile();
         fh.testLoadTableFromFile();
+        fh.testExportTableAsTxt();
 
     }
 }

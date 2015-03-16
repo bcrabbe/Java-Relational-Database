@@ -20,7 +20,6 @@ Class Driver
    public static void main(String[] args)
    {
       Driver program = new Driver();
-
       program.run();
    }
 }

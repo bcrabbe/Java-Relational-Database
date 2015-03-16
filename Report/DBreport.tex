@@ -465,24 +465,525 @@ class Attribute
 \end{lstlisting}
 
 
+
+
+
+
+
+
+
+
+
 \section{FIles} 
+To handle table saving, loading and exporting I have made a FileHandler class. 
+
+
+
+
+
+\subsection{Saving}
+To save files I added a toSaveString() method to Table class, 
 
 \begin{lstlisting}
+    String toSaveString()
+    {
+        String tableString = name + "||";
+        try {
+            List<String> attNames = getAttributeNames();
+            for(String column: attNames) {
+                tableString = tableString.concat(column);
+                tableString = tableString.concat("|");
+            }
+            tableString = tableString.concat("|");
+            for(Tuple row: tableBody) {
+                for(String attName: attNames) {
+                    tableString = tableString.concat(row.getAttributeValue(attName));
+                    tableString = tableString.concat("|");
+                }
+                tableString =  tableString.concat("|");
+            }
+        } catch(Exception e) {
+            System.out.println(e.getMessage());
+            throw new Error();
+        }
+        return tableString;
+    }
 \end{lstlisting}
+
+I used a single pipe( "$\mid$" ) to delimit columns, and double for rows these were defined in the FileHandler class:
+\begin{lstlisting}
+
+    final static private String encoding = "UTF-8";
+    final static String newLineDelim = Pattern.quote("||");
+    final static String columnDelim = Pattern.quote("|");
+\end{lstlisting}
+
+To stop field names containing pipes I added a method isValidName() which all attribute values and names, and table names were passed through before being set.
 
 \begin{lstlisting}
+   static boolean isValidName(String name) throws Exception
+    {
+        if( name.contains(FileHandler.columnDelim) ||
+           name.contains(FileHandler.newLineDelim) ) {
+            throw new Exception(name + " is invalid. names cannot contain any of: " +
+                                FileHandler.columnDelim + FileHandler.newLineDelim);
+        }
+        else return true;
+    }
 \end{lstlisting}
+
+
+The FileHandlerClass is then used to save the table. saveTableToFile() provides a descriptive interface, whilst stringToFile() to which it delegates the actual io , is generic and reusable.
+\begin{lstlisting}
+
+    void saveTableToFile(Table t, String fpath)
+    {
+        stringToFile( t.toSaveString(), fpath);
+    }
+
+    private void stringToFile(String s, String fpath)
+    {
+        Writer writer = null;
+        try {
+            writer = new BufferedWriter(
+                        new OutputStreamWriter(
+                            new FileOutputStream(fpath), encoding));
+            writer.write(s);
+        } catch (IOException e) {
+            System.out.println(e.getMessage());
+        } finally {
+            try {
+                writer.close();
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
+            }
+        }
+    }
+\end{lstlisting}
+
+
+
+
+
+
+\subsection{Loading}
+
+Loading from the produced save strings is handled similarly. A generic method readFile() gets all the text form a file:
 
 \begin{lstlisting}
+    static String readFile(String fpath) throws IOException
+    {
+        byte[] encoded = Files.readAllBytes(Paths.get(fpath));
+        return new String(encoded, encoding);
+    }
+    
 \end{lstlisting}
+
+and a function which splits the saved string up and builds the table which it returns. I think that theres perhaps too much detailed table handling for this to be in the FileHandler class, it could be better to just pass the file string to a constructor and let the Table class deal with it, but there is already a constructor that accepts a single String and sets just the table name. So I am going to leave it like this until I have worked out how users will create tables.
 
 \begin{lstlisting}
+    Table loadTableFromFile(String fpath)
+    {
+        try {
+            String tableString = new String(readFile(fpath));
+            String[] tableRowStrings = tableString.split(newLineDelim);
+            String[] tableHeadings = tableRowStrings[1].split(columnDelim);
+            Table newTable = new Table(tableRowStrings[0],//[0] has table name
+                                       Arrays.asList(tableHeadings));
+            for(int i=2; i<tableRowStrings.length; ++i) {
+                newTable.addTuple(tableRowStrings[i].split(columnDelim));
+            }
+            return newTable;
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            throw new Error();
+        }
+    }
+
 \end{lstlisting}
+
+
+
+
+\subsection{Printing/Exporting}
+
+FileHandler provides the interface:
+
 
 \begin{lstlisting}
+    void exportTableAsTxt(Table t, String fpath)
+    {
+        List<String> rowStrings = t.presentTableForPrinting();
+        stringListToFile(rowStrings, fpath);
+    }
+\end{lstlisting}
+
+which just uses the stringToFileMethod I already wrote:
+
+\begin{lstlisting}
+    private void stringListToFile(List<String> strList, String fpath)
+    {
+        String combined = "";
+        for(String str: strList) {
+            combined = combined.concat(str);
+        }
+        stringToFile(combined,fpath);
+    }
+    
+\end{lstlisting}
+
+the table handles the formatting:
+
+\begin{lstlisting}
+    private int spacesBetweenCols = 4;
+
+    List<String> presentTableForPrinting()
+    {
+        List<String> presentedTable = new ArrayList<String>();
+        List<String> headings = getAttributeNames();
+        List<Integer> headingWidths = getColumnWidths(headings);
+        
+        presentedTable.add(name);
+        presentedTable.add("\n\n\n");
+        
+        presentedTable.add(presentTableRow(headings, headingWidths));
+        presentedTable.add( makeStringOfChar( getTableWidth(headingWidths), '-') + "\n" );
+        
+        for(Tuple row: tableBody) {
+            List<String> rowString = row.toListOfStrings();
+            presentedTable.add(presentTableRow(rowString, headingWidths));
+        }
+        return presentedTable;
+    }
+    
+    private int getTableWidth(List<Integer> headingWidths)
+    {
+        int sum = 0;
+        for(int headingWidth : headingWidths) {
+            sum += headingWidth;
+        }
+        sum +=spacesBetweenCols*countColumns();
+        return sum;
+    }
+    
+    private String presentTableRow(List<String> rowStrings, List<Integer> headingWidths)
+    {
+        String presentedRow = "";
+        for(int i=0; i<rowStrings.size(); ++i)
+        {
+            int strWidth = getWidthOfString(rowStrings.get(i));
+            int spacesNeeded = headingWidths.get(i) - strWidth;
+            presentedRow = presentedRow.concat(rowStrings.get(i));
+            presentedRow = presentedRow.concat(makeStringOfChar(spacesNeeded+spacesBetweenCols, ' '));
+        }
+        presentedRow += '\n';
+        return presentedRow;
+    }
+    
+    private String makeStringOfChar(int number, char c)
+    {
+        String s = "";
+        for(int i=0; i<number; ++i)
+        {
+            s = s + c;
+        }
+        return s;
+    }
+    
+    private List<Integer> getColumnWidths(List<String> headings)
+    {
+        List<Integer> headingWidths = new ArrayList<Integer>();
+        for(String heading: headings) {
+            headingWidths.add(getWidthOfString(heading));
+        }
+        return headingWidths;
+    }
+    
+    private int getColumnWidth(String attributeName) throws Exception
+    {
+        Attribute a = getAttributeFromName(attributeName);
+        int maxwidth = getWidthOfString(attributeName);
+        for(Tuple row: tableBody) {
+            String valueString = row.getAttributeValue(attributeName);
+            int width = getWidthOfString(valueString);
+            maxwidth = width > maxwidth ? width : maxwidth;
+        }
+        return maxwidth;
+    }
+
+    static int getWidthOfString(String str)
+    {
+        int width=0, maxwidth=0;
+        for( char c: str.toCharArray() ) {
+            if(c=='\n' || c=='\r') {
+                maxwidth = width > maxwidth ? width : maxwidth;
+                width = 0;
+            }
+            else {
+                ++width;
+            }
+        }
+        maxwidth = width > maxwidth ? width : maxwidth;
+        return maxwidth;
+    }
+
+\end{lstlisting}
+
+an example of the output is: 
+
+
+
+\begin{lstlisting}
+testTable2
+
+
+Attribute1    Att2    A3    
+----------------------------
+value1        val1    v1    
+value2        val2    v2    
+
+\end{lstlisting}
+
+Here is the full module:
+
+\begin{lstlisting}
+
+
+import static java.nio.file.StandardOpenOption.*;
+import java.nio.*;
+import java.nio.channels.*;
+import java.nio.file.*;
+import java.nio.file.attribute.*;
+import java.io.*;
+import java.util.*;
+import java.lang.Object;
+import java.util.regex.Pattern;
+
+class FileHandler
+{
+    final static private String encoding = "UTF-8";
+    final static String newLineDelim = Pattern.quote("||");
+    final static String columnDelim = Pattern.quote("|");
+    
+    FileHandler()
+    {
+        
+    }
+    
+    void exportTableAsTxt(Table t, String fpath)
+    {
+        List<String> rowStrings = t.presentTableForPrinting();
+        stringListToFile(rowStrings, fpath);
+    }
+    
+    private void stringListToFile(List<String> strList, String fpath)
+    {
+        String combined = "";
+        for(String str: strList) {
+            combined = combined.concat(str);
+        }
+        stringToFile(combined,fpath);
+    }
+    
+    void saveTableToFile(Table t, String fpath)
+    {
+        stringToFile( t.toSaveString(), fpath);
+    }
+    
+    private void stringToFile(String s, String fpath)
+    {
+        Writer writer = null;
+        try {
+            writer = new BufferedWriter(
+                        new OutputStreamWriter(
+                            new FileOutputStream(fpath), encoding));
+            writer.write(s);
+        } catch (IOException e) {
+            System.out.println(e.getMessage());
+        } finally {
+            try {
+                writer.close();
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
+            }
+        }
+    }
+    
+    static private List<String> trimWhiteSpace(String[] oldStrings)
+    {
+        List<String> newStrings = new ArrayList<String>();
+        for(String s: oldStrings) {
+            newStrings.add(s.trim());
+        }
+        return newStrings;
+    }
+    
+    Table loadTableFromFile(String fpath)
+    {
+        try {
+            String tableString = new String(readFile(fpath));
+            String[] tableRowStrings = tableString.split(newLineDelim);
+            String[] tableHeadings = tableRowStrings[1].split(columnDelim);
+            Table newTable = new Table(tableRowStrings[0],//[0] has table name
+                                       Arrays.asList(tableHeadings));
+            for(int i=2; i<tableRowStrings.length; ++i) {
+                newTable.addTuple(tableRowStrings[i].split(columnDelim));
+            }
+            return newTable;
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            throw new Error();
+        }
+    }
+    
+    static String readFile(String fpath) throws IOException
+    {
+        byte[] encoded = Files.readAllBytes(Paths.get(fpath));
+        return new String(encoded, encoding);
+    }
+    
+    void testReadFile()
+    {
+        testSaveTable();
+        try {
+            String file = readFile("./saves/test.txt");
+            System.out.println(file);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            throw new Error();
+        }
+    }
+    
+    void testSaveTable()
+    {
+        List<String> attributeNames2 = new ArrayList<String>(3);
+        attributeNames2.add("Attribute1");
+        attributeNames2.add("Attribute2");
+        attributeNames2.add("Attribute3");
+        try {
+            Table t2 = new Table("testTable2",attributeNames2);
+            t2.addTuple("value1","value1","value1");
+            t2.addTuple("value2","value2","value2");
+            String tableString = t2.toSaveString();
+            saveTableToFile(t2,"./saves/test.txt");
+        } catch(Exception e) {
+            System.out.println(e.getMessage());
+            throw new Error();
+        }
+    }
+    
+    void testLoadTableFromFile()
+    {
+        try {
+            testSaveTable();//make sure we have a file there
+            Table testT = loadTableFromFile("./saves/test.txt");
+            String stringInFile = readFile("./saves/test.txt");
+            is(testT.toSaveString(),stringInFile);
+        } catch(Exception e) {
+            System.out.println(e.getMessage());
+            throw new Error();
+        }
+    }
+
+    void testExportTableAsTxt()
+    {
+        List<String> attributeNames2 = new ArrayList<String>(3);
+        attributeNames2.add("Attribute1");
+        attributeNames2.add("Att2");
+        attributeNames2.add("A3");
+        try {
+            Table t2 = new Table("testTable2",attributeNames2);
+            t2.addTuple("value1","val1","v1");
+            t2.addTuple("value2","val2","v2");
+            exportTableAsTxt(t2, "./exports/test.txt");
+        } catch(Exception e) {
+            System.out.println(e.getMessage());
+            throw new Error();
+        }
+    }
+    
+    static void is(Object x, Object y)
+    {
+        System.out.print("testing " + x.toString() + " = " + y.toString() );
+        
+        if (x==y || (x != null && x.equals(y)) ) {
+            System.out.println("...pass");
+            return;
+        }
+        System.out.print("...fail");
+    }
+    
+    public static void main(String[] args)
+    {
+        FileHandler fh = new FileHandler();
+        fh.testSaveTable();
+        fh.testReadFile();
+        fh.testLoadTableFromFile();
+        fh.testExportTableAsTxt();
+
+    }
+}
 \end{lstlisting}
 
 
+
+\begin{lstlisting}
+
+\end{lstlisting}
+
+
+
+\begin{lstlisting}
+
+\end{lstlisting}
+
+
+
+
+\begin{lstlisting}
+
+\end{lstlisting}
+
+
+
+
+\begin{lstlisting}
+
+\end{lstlisting}
+
+
+
+
+\begin{lstlisting}
+
+\end{lstlisting}
+
+
+
+
+\begin{lstlisting}
+
+\end{lstlisting}
+
+
+
+
+\begin{lstlisting}
+
+\end{lstlisting}
+
+
+
+
+\begin{lstlisting}
+
+\end{lstlisting}
+
+
+
+\begin{lstlisting}
+
+\end{lstlisting}
 
 
 
