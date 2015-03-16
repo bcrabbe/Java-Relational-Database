@@ -66,7 +66,6 @@ class Table
         if( !isAttributeSetUnique(attributeNames) ) {
             throw new Exception("Suggested PK is not unique. Cannot set.");
         }
-      
         else {
             for(String attributeName: attributeNames) {
                 primaryKey.add(getAttributeFromName(attributeName));
