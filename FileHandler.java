@@ -75,8 +75,9 @@ class FileHandler
             String tableString = new String(readFile(fpath));
             String[] tableRowStrings = tableString.split(newLineDelim);
             String[] tableHeadings = tableRowStrings[1].split(columnDelim);
-            Table newTable = new Table(tableRowStrings[0],//[0] has table name
-                                       Arrays.asList(tableHeadings));
+            String tableName = tableRowStrings[0];
+            Table newTable = new Table(tableName, tableHeadings
+                                       tableRowStrings);
             for(int i=2; i<tableRowStrings.length; ++i) {
                 newTable.addTuple(tableRowStrings[i].split(columnDelim));
             }

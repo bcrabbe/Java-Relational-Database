@@ -7,15 +7,12 @@ class Table
     Set<Tuple> tableBody;// a set of tuples
     List<Attribute> primaryKey;
 
-    Table(String saveString) throws Exception
+    Table(String tableName, String[] tableHeadings, String[] tableRows) throws Exception
     {
-        this(saveString.split(FileHandler.newLineDelim)[0],//gets table name from saveString then the table heading:
-                      Arrays.asList(saveString.split(FileHandler.newLineDelim)[1].split(FileHandler.columnDelim)));
-        
-        String[] tableRowStrings = saveString.split(FileHandler.newLineDelim);
+        this(tableName, tableHeadings);
         try {
             for(int i=2; i<tableRowStrings.length; ++i) {
-                addTuple(tableRowStrings[i].split(FileHandler.columnDelim));
+                addTuple(tableRows[i].split(FileHandler.columnDelim));
             }
         } catch (Exception e) {
             System.out.println(e.getMessage());
@@ -23,7 +20,7 @@ class Table
         }
     }
 
-    Table(String name, List<String> attributeNames) throws Exception
+    Table(String name, String[] attributeNames) throws Exception
     {
         try {
             setNameIfValid(name);
@@ -32,9 +29,7 @@ class Table
             for(String attributeName: attributeNames) {
                 addAttribute(attributeName);
             }
-            String[] attributeNamesArray = attributeNames.toArray(new String[0]);
-            System.out.print(attributeNamesArray.toString());//DODGEY
-            setPrimaryKey(attributeNamesArray);
+            setPrimaryKey(attributeNames);
         } catch (Exception e) {
             System.out.println(e.getMessage());
             throw new Exception("Could not create table");
