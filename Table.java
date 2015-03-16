@@ -7,13 +7,14 @@ class Table
     Set<Tuple> tableBody;// a set of tuples
     List<Attribute> primaryKey;
 
-    Table(String tableName, String[] tableHeadings, String[] tableRows) throws Exception
+    Table(String tableName, String[] primaryKey, String[] tableHeadings, String[] tableRows) throws Exception
     {
         this(tableName, tableHeadings);
         try {
-            for(int i=2; i<tableRowStrings.length; ++i) {
+            for(int i=3; i<tableRows.length; ++i) {
                 addTuple(tableRows[i].split(FileHandler.columnDelim));
             }
+            setPrimaryKey(primaryKey);
         } catch (Exception e) {
             System.out.println(e.getMessage());
             throw new Exception("Could not load table");
@@ -29,10 +30,10 @@ class Table
             for(String attributeName: attributeNames) {
                 addAttribute(attributeName);
             }
+            primaryKey = new ArrayList<Attribute>();
             setPrimaryKey(attributeNames);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             System.out.println(e.getMessage());
-            throw new Exception("Could not create table");
         }
     }
     
@@ -55,16 +56,17 @@ class Table
     
     void setPrimaryKey(String... attributeNames) throws Exception
     {
-        if( countRows()==0 ) {
+        if( countColumns()==0 ) {
             throw new Exception("There are no attributes.");
         }
-        if( !isAttributeSetUnique(attributeNames) ) {
-            throw new Exception("Suggested PK is not unique. Cannot set.");
-        }
-        else {
-            for(String attributeName: attributeNames) {
-                primaryKey.add(getAttributeFromName(attributeName));
+        if( countRows()>0 )  {
+            if( !isAttributeSetUnique(attributeNames) ) {
+                throw new Exception("Suggested PK is not unique. Cannot set.");
             }
+        }
+        primaryKey.clear();
+        for(String attributeName: attributeNames) {
+            primaryKey.add(getAttributeFromName(attributeName));
         }
     }
     
@@ -75,11 +77,16 @@ class Table
         if( allValuesSet.size() < allValues.size() ) return false;
         else return true;
     }
-    
+
     String toSaveString()
     {
         String tableString = name + "||";
         try {
+            for(Attribute key: primaryKey) {
+                tableString = tableString.concat(key.name);
+                tableString = tableString.concat("|");
+            }
+            tableString = tableString.concat("|");
             List<String> attNames = getAttributeNames();
             for(String column: attNames) {
                 tableString = tableString.concat(column);
@@ -103,7 +110,7 @@ class Table
     boolean attributeExists(String attributeName)
     {
         for(Attribute a: tableHeading) {
-            if(a.name==attributeName) {
+            if(a.name.equals(attributeName)) {
                 return true;
             }
         }
@@ -169,7 +176,7 @@ class Table
     private Attribute getAttributeFromName(String name) throws Exception
     {
         for(Attribute field: tableHeading) {
-            if(field.name==name) {
+            if(field.name.equals(name)) {
                 return field;
             }
         }
@@ -190,6 +197,9 @@ class Table
     
     void addTuple(String... values) throws Exception
     {
+        if(doesTupleExist(values)) {
+            throw new Exception("Duplicate tuple discarded");
+        }
         if(values.length != tableHeading.size()) {
             throw new Exception("addTuple() for Table " + name + " expects " +
                                     tableHeading.size() + " data values. It received " +
@@ -245,7 +255,7 @@ class Table
         List<Integer> headingWidths = getColumnWidths(headings);
         
         presentedTable.add(name);
-        presentedTable.add("\n\n\n");
+        presentedTable.add("\n\n");
         
         presentedTable.add(presentTableRow(headings, headingWidths));
         presentedTable.add( makeStringOfChar( getTableWidth(headingWidths), '-') + "\n" );
@@ -356,14 +366,16 @@ class Table
     
     void testCreateTable()
     {
+        System.out.println("testing testCreateTable");
         try {
             viewTable();
+            System.out.print(getAttributeNames());
             is( attributeExists("Attribute1"), true);
             is( attributeExists("Attribute2"), true);
             is( attributeExists("Attribute3"), true);
             is( countColumns(), 3);
             is(toSaveString(),
-               "testTable2||Attribute1|Attribute2|Attribute3||value1|value1|value1||value2|value2|value2||");
+               "testTable2||Attribute1|Attribute2|Attribute3||Attribute1|Attribute2|Attribute3||value1|value1|value1||value2|value2|value2||");
             addTuple("value3","value3","value3");
             addTuple("value4","value4","value4");
             is(countRows(),4);
@@ -373,30 +385,52 @@ class Table
         }
 
     }
+    
     void testSetPrimaryKey()
     {   try {
+            System.out.println("testing testSetPrimaryKey");
             setPrimaryKey("Attribute1");
             is(primaryKey.get(0), getAttributeFromName("Attribute1"));
             setPrimaryKey("Attribute2");
-            is(primaryKey.get(0), getAttributeFromName("Attribute1"));
-            List<String> compoundPK = new ArrayList<String>();
-            compoundPK.add("Attribute2");
-            compoundPK.add("Attribute3");
+            is(primaryKey.size(),1);
+            is(primaryKey.get(0), getAttributeFromName("Attribute2"));
+            List<Attribute> compoundPK = new ArrayList<Attribute>();
+            compoundPK.add(getAttributeFromName("Attribute2"));
+            compoundPK.add(getAttributeFromName("Attribute3"));
             setPrimaryKey("Attribute2","Attribute3");
             is(primaryKey.containsAll(compoundPK), true);
-
+            addTuple("value2","value5","value5");
+            addTuple("value1","value6","value6");
+            setPrimaryKey("Attribute1");
         } catch(Exception e) {
+            is(e.getMessage(),"Suggested PK is not unique. Cannot set.");
             System.out.println(e.getMessage());
         }
+    }
+    
+    void testUniquenessConstraint()
+    {
+        System.out.println("testing testUniquenessConstraint");
+        viewTable();
+        int countRowsB4 = countRows();
+        try {
+            addTuple("value3","value3","value3");
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+        }
+        is(countRows(),countRowsB4);
+
     }
     
     public static void main(String[] args)
     {
         try {
-            Table t2 = new Table(FileHandler.readFile("./saves/test.txt"));
+            Table t2 = FileHandler.loadTableFromFile("./saves/test.txt");
             t2.testCreateTable();
             t2.testGetWidthOfString();
             t2.testSetPrimaryKey();
+            t2.testUniquenessConstraint();
+
         } catch(Exception e) {
             System.out.println(e.getMessage());
         }

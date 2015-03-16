@@ -1,4 +1,4 @@
-Class Driver
+class Driver
 {
     void run()
     {
@@ -13,7 +13,7 @@ Class Driver
             System.out.println("...pass");
             return;
         }
-        System.out.print("...fail");
+        System.out.println("...fail");
     }
 
 

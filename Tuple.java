@@ -51,7 +51,7 @@ class Tuple
     private AttributeValue getAttributeValueObjFromName(String attributeName) throws Exception
     {
         for(AttributeValue attribute: attributes) {
-            if(attribute.type.name==attributeName) {
+            if(attribute.type.name.equals(attributeName)) {
                 return attribute;
             }
         }

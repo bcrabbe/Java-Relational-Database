@@ -926,36 +926,246 @@ class FileHandler
 \end{lstlisting}
 
 
+\section{Keys}
+
+Since I had tried to follow the relational model as closely as possible from the start attributes were already addressed by their values rather than row/col numbers. 
+
+To add a defined PrimaryKey I added a member to the Table class :    List$\prec$ Attribute$ \succ $primaryKey;
+
+As default the table constructor sets primaryKey to all the attributes, which is ensured to be unique by a method doesTupleExist i have added, and called within each addTuple call.
 
 \begin{lstlisting}
+    private boolean doesTupleExist(String... values)
+    {
+        List<String> newTupleValues = Arrays.asList(values);
+        for(Tuple row: tableBody) {
+            List<String> rowValues = row.getAllValuesOfTuple();
+            if(rowValues.size() == newTupleValues.size() && rowValues.containsAll(newTupleValues)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    void addTuple(String... values) throws Exception
+    {
+        if(doesTupleExist(values)) {
+            throw new Exception("Duplicate tuple discarded");
+        }
+        if(values.length != tableHeading.size()) {
+            throw new Exception("addTuple() for Table " + name + " expects " +
+                                    tableHeading.size() + " data values. It received " +
+                                    values.length);
+        }
+        else {
+            Tuple newTuple = new Tuple(tableHeading, Arrays.asList(values));
+            tableBody.add(newTuple);
+        }
+    }
+\end{lstlisting}
+
+which uses this in the Tuple class:
+
+\begin{lstlisting}
+  List<String> getAllValuesOfTuple()
+    {
+        List<String> allValuesOfTuple = new ArrayList<String>();
+        for(AttributeValue av: attributes) {
+            allValuesOfTuple.add(av.value);
+        }
+        return allValuesOfTuple;
+    }
+    
+\end{lstlisting}
+  
+
+The primary key can then be set to a specific attribute at any point with.
+\begin{lstlisting}
+    
+    void setPrimaryKey(String... attributeNames) throws Exception
+    {
+        if( countColumns()==0 ) {
+            throw new Exception("There are no attributes.");
+        }
+        if( countRows()>0 )  {
+            if( !isAttributeSetUnique(attributeNames) ) {
+                throw new Exception("Suggested PK is not unique. Cannot set.");
+            }
+        }
+        primaryKey.clear();
+        for(String attributeName: attributeNames) {
+            primaryKey.add(getAttributeFromName(attributeName));
+        }
+    }
+    
+    
+    private boolean isAttributeSetUnique(String... attributeNames) throws Exception
+    {
+        List<String> allValues = getAllValuesOfAttribute(attributeNames);
+        Set<String> allValuesSet = new HashSet<String>(allValues);
+        if( allValuesSet.size() < allValues.size() ) return false;
+        else return true;
+    }
+    
+\end{lstlisting}
+
+
+I have added an extra bit to the save/load methods to store/extract the tables primary key.
+
+I have replaced the Table constructor that accepted just a table name to one that works better with the loadTableFromFile method. 
+That method now deals with all the file decoding, and sends all the info to the new constructor:
+
+\begin{lstlisting}
+    static Table loadTableFromFile(String fpath)
+    {
+        try {
+            String tableString = new String(readFile(fpath));
+            String[] tableRowStrings = tableString.split(newLineDelim);
+            String[] tableHeadings = tableRowStrings[2].split(columnDelim);
+            String[] primaryKey = tableRowStrings[1].split(columnDelim);
+            String tableName = tableRowStrings[0];
+            Table newTable = new Table(tableName, primaryKey, tableHeadings,
+                                       tableRowStrings);
+            return newTable;
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            throw new Error();
+        }
+    }
+
+
+  Table(String tableName, String[] primaryKey, String[] tableHeadings, String[] tableRows) throws Exception
+    {
+        this(tableName, tableHeadings);
+        try {
+            for(int i=3; i<tableRows.length; ++i) {
+                addTuple(tableRows[i].split(FileHandler.columnDelim));
+            }
+            setPrimaryKey(primaryKey);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            throw new Exception("Could not load table");
+        }
+    }
+\end{lstlisting}
+
+
+
+
+
+
+
+\section{Database}
+
+I decided to store tables in a set, since order should not be important. Names are required to be unique.
+
+
+\begin{lstlisting}
+import java.util.*;
+
+
+class Database
+{
+    Set<Table> tables;
+
+    Database()
+    {
+        tables = new LinkedHashSet<Table>();
+    }
+    
+    Database(List<Table> tables) throws Exception
+    {
+        this();
+        for(Table t: tables) {
+            addTable(t);
+        }
+    }
+    
+    List<String> showTables()
+    {
+        List<String> tableNames = new ArrayList<String>();
+        for(Table t: tables) {
+            tableNames.add(t.name);
+        }
+        return tableNames;
+    }
+    
+    boolean isNameClash(String name)
+    {
+        for(Table t: tables) {
+            if(t.name.equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    void addTable(Table t) throws Exception
+    {
+        if(isNameClash(t.name)) {
+            throw new Exception("Table called " + t.name + " already exists in Database");
+        } else {
+            tables.add(t);
+        }
+    }
+    
+    String toSaveString()
+    {
+        String saveString = new String();
+        for(Table t: tables) {
+            saveString += t.toSaveString();
+            saveString += "|";
+        }
+        return saveString;
+    }
+    
+    void testLoadDB()
+    {
+        Driver.is(showTables().contains("testTable2"),true);
+        Driver.is(showTables().contains("testTable3"),true);
+        Driver.is(showTables().contains("testTable"),true);
+    }
+    
+    void testLoadDbWithNameClash()
+    {
+        Driver.is(tables.size(),2);
+        Driver.is(showTables().contains("testTable2"),true);
+        Driver.is(showTables().contains("testTable"),true);
+    }
+    
+    public static void main(String[] args)
+    {
+        Database db = FileHandler.loadDataBaseFromFile("./saves/testDB.txt");
+        db.testLoadDB();
+        Database db2 = FileHandler.loadDataBaseFromFile("./saves/testDBaddTable.txt");
+        db2.testLoadDbWithNameClash();
+
+    }
+}
 
 \end{lstlisting}
 
 
 
-\begin{lstlisting}
-
-\end{lstlisting}
-
-
-
+I added loading and saving methods to FileHandler to deal with databases. These use a 3rd pipe to delimit tables.
 
 \begin{lstlisting}
-
-\end{lstlisting}
-
-
-
-
-\begin{lstlisting}
-
-\end{lstlisting}
-
-
-
-
-\begin{lstlisting}
-
+    static Database loadDataBaseFromFile(String fpath)
+    {
+        try {
+            String dbString = new String(readFile(fpath));
+            String[] tableStrings = dbString.split(newTableDelim);
+            List<Table> tables =  new ArrayList<Table>();
+            for(String tableString: tableStrings) {
+                tables.add(loadTableFromString(tableString));
+            }
+            Database db = new Database(tables);
+            return db;
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            throw new Error();
+        }
+    }
 \end{lstlisting}
 
 
