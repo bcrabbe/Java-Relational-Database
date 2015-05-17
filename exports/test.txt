@@ -1,6 +1,0 @@
-testTable2
-
-Attribute1    Att2    A3    
-----------------------------
-value1        val1    v1    
-value2        val2    v2    

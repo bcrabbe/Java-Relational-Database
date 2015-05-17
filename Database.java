@@ -72,10 +72,13 @@ class Database
     
     public static void main(String[] args)
     {
-        Database db = FileHandler.loadDataBaseFromFile("./saves/testDB.txt");
-        db.testLoadDB();
-        Database db2 = FileHandler.loadDataBaseFromFile("./saves/testDBaddTable.txt");
-        db2.testLoadDbWithNameClash();
-
+        try {
+            Database db = FileHandler.loadDataBaseFromFile("./testDB.txt");
+            db.testLoadDB();
+            Database db2 = FileHandler.loadDataBaseFromFile("./testDBaddTable.txt");
+            db2.testLoadDbWithNameClash();
+        } catch(Exception e) {
+            System.out.print(e.getMessage());
+        }
     }
 }

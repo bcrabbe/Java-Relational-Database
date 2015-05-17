@@ -105,15 +105,6 @@ class Tuple
         return rowString;
     }
     
-    static void is(Object x, Object y)
-    {
-        if (x==y || (x != null && x.equals(y)) ) {
-            System.out.println("pass");
-            return;
-        }
-        System.out.println("fail");
-        throw new Error("Error:\n" + x + "\n" + y);
-    }
 
     public static void main(String[] args)
     {
@@ -126,10 +117,10 @@ class Tuple
         try {
             Attribute newAttribute = new Attribute("test");
             addAttribute(newAttribute,"value1");
-            is(1,countAttributes());
-            is("value1",getAttributeValue("test"));
+            Driver.is(1,countAttributes());
+            Driver.is("value1",getAttributeValue("test"));
             setAttributeValue("test", "value2");
-            is("value2",getAttributeValue("test"));
+            Driver.is("value2",getAttributeValue("test"));
         } catch (Exception e) {
             System.out.println(e.getMessage());
         }

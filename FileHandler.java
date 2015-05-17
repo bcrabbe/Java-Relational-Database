@@ -66,21 +66,16 @@ class FileHandler
         }
     }
     
-    static Database loadDataBaseFromFile(String fpath)
+    static Database loadDataBaseFromFile(String fpath) throws Exception
     {
-        try {
-            String dbString = new String(readFile(fpath));
-            String[] tableStrings = dbString.split(newTableDelim);
-            List<Table> tables =  new ArrayList<Table>();
-            for(String tableString: tableStrings) {
-                tables.add(loadTableFromString(tableString));
-            }
-            Database db = new Database(tables);
-            return db;
-        } catch (Exception e) {
-            System.out.println(e.getMessage());
-            throw new Error();
+        String dbString = new String(readFile(fpath));
+        String[] tableStrings = dbString.split(newTableDelim);
+        List<Table> tables =  new ArrayList<Table>();
+        for(String tableString: tableStrings) {
+            tables.add(loadTableFromString(tableString));
         }
+        Database db = new Database(tables);
+        return db;
     }
     
     static private List<String> trimWhiteSpace(String[] oldStrings)
@@ -132,8 +127,8 @@ class FileHandler
             t2.addTuple("value1","value1","value1");
             t2.addTuple("value2","value2","value2");
             String tableString = t2.toSaveString();
-            saveTableToFile(t2,"./saves/test.txt");
-            is(readFile("./saves/test.txt"), "testTable2||Attribute1|Attribute2|Attribute3||Attribute1|Attribute2|Attribute3||value1|value1|value1||value2|value2|value2||");
+            saveTableToFile(t2,"./test.txt");
+            Driver.is(readFile("./test.txt"), "testTable2||Attribute1|Attribute2|Attribute3||Attribute1|Attribute2|Attribute3||value1|value1|value1||value2|value2|value2||");
         } catch(Exception e) {
             System.out.println(e.getMessage());
             throw new Error();
@@ -145,9 +140,9 @@ class FileHandler
         System.out.println("Testing : testLoadTableFromFile()\n ");
 
         try {
-            Table testT = loadTableFromFile("./saves/test.txt");
-            String stringInFile = readFile("./saves/test.txt");
-            is(testT.toSaveString(),stringInFile);
+            Table testT = loadTableFromFile("./test.txt");
+            String stringInFile = readFile("./test.txt");
+            Driver.is(testT.toSaveString(),stringInFile);
         } catch(Exception e) {
             System.out.println(e.getMessage());
             throw new Error();
@@ -163,22 +158,11 @@ class FileHandler
             Table t2 = new Table("testTable2",attributeNames);
             t2.addTuple("value1","val1","v1");
             t2.addTuple("value2","val2","v2");
-            exportTableAsTxt(t2, "./exports/test.txt");
+            exportTableAsTxt(t2, "./exporttest.txt");
         } catch(Exception e) {
             System.out.println(e.getMessage());
             throw new Error();
         }
-    }
-    
-    static void is(Object x, Object y)
-    {
-        System.out.print("testing " + x.toString() + " = " + y.toString() );
-        
-        if (x==y || (x != null && x.equals(y)) ) {
-            System.out.println("...pass\n");
-            return;
-        }
-        System.out.print("...fail\n");
     }
     
     public static void main(String[] args)

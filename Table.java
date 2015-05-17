@@ -31,7 +31,7 @@ class Table
                 addAttribute(attributeName);
             }
             primaryKey = new ArrayList<Attribute>();
-            setPrimaryKey(attributeNames);
+            setPrimaryKey(attributeNames);//set to all attributes as default
         } catch (Throwable e) {
             System.out.println(e.getMessage());
         }
@@ -69,7 +69,7 @@ class Table
             primaryKey.add(getAttributeFromName(attributeName));
         }
     }
-    
+
     private boolean isAttributeSetUnique(String... attributeNames) throws Exception
     {
         List<String> allValues = getAllValuesOfAttribute(attributeNames);
@@ -340,22 +340,12 @@ class Table
     
     void testGetWidthOfString()
     {
-        is(getWidthOfString("123456"),6);
-        is(getWidthOfString("123\n123456\n123"),6);
-        is(getWidthOfString("123\n\r123456\n\r123456"),6);
+        Driver.is(getWidthOfString("123456"),6);
+        Driver.is(getWidthOfString("123\n123456\n123"),6);
+        Driver.is(getWidthOfString("123\n\r123456\n\r123456"),6);
     }
     
-    static void is(Object x, Object y)
-    {
-        System.out.print("testing " + x.toString() + " = " + y.toString() );
-        
-        if (x==y || (x != null && x.equals(y)) ) {
-            System.out.println("...pass");
-            return;
-        }
-        System.out.println("...fail");
-    }
-    
+
     void viewTable()
     {
         List<String> table = presentTableForPrinting();
@@ -370,16 +360,16 @@ class Table
         try {
             viewTable();
             System.out.print(getAttributeNames());
-            is( attributeExists("Attribute1"), true);
-            is( attributeExists("Attribute2"), true);
-            is( attributeExists("Attribute3"), true);
-            is( countColumns(), 3);
-            is(toSaveString(),
+            Driver.is( attributeExists("Attribute1"), true);
+            Driver.is( attributeExists("Attribute2"), true);
+            Driver.is( attributeExists("Attribute3"), true);
+            Driver.is( countColumns(), 3);
+            Driver.is(toSaveString(),
                "testTable2||Attribute1|Attribute2|Attribute3||Attribute1|Attribute2|Attribute3||value1|value1|value1||value2|value2|value2||");
             addTuple("value3","value3","value3");
             addTuple("value4","value4","value4");
-            is(countRows(),4);
-            is(primaryKey.containsAll(tableHeading),true );
+            Driver.is(countRows(),4);
+            Driver.is(primaryKey.containsAll(tableHeading),true );
         } catch(Exception e) {
             System.out.println(e.getMessage());
         }
@@ -390,20 +380,20 @@ class Table
     {   try {
             System.out.println("testing testSetPrimaryKey");
             setPrimaryKey("Attribute1");
-            is(primaryKey.get(0), getAttributeFromName("Attribute1"));
+            Driver.is(primaryKey.get(0), getAttributeFromName("Attribute1"));
             setPrimaryKey("Attribute2");
-            is(primaryKey.size(),1);
-            is(primaryKey.get(0), getAttributeFromName("Attribute2"));
+            Driver.is(primaryKey.size(),1);
+            Driver.is(primaryKey.get(0), getAttributeFromName("Attribute2"));
             List<Attribute> compoundPK = new ArrayList<Attribute>();
             compoundPK.add(getAttributeFromName("Attribute2"));
             compoundPK.add(getAttributeFromName("Attribute3"));
             setPrimaryKey("Attribute2","Attribute3");
-            is(primaryKey.containsAll(compoundPK), true);
+            Driver.is(primaryKey.containsAll(compoundPK), true);
             addTuple("value2","value5","value5");
             addTuple("value1","value6","value6");
             setPrimaryKey("Attribute1");
         } catch(Exception e) {
-            is(e.getMessage(),"Suggested PK is not unique. Cannot set.");
+            Driver.is(e.getMessage(),"Suggested PK is not unique. Cannot set.");
             System.out.println(e.getMessage());
         }
     }
@@ -418,14 +408,14 @@ class Table
         } catch (Exception e) {
             System.out.println(e.getMessage());
         }
-        is(countRows(),countRowsB4);
+        Driver.is(countRows(),countRowsB4);
 
     }
     
     public static void main(String[] args)
     {
         try {
-            Table t2 = FileHandler.loadTableFromFile("./saves/test.txt");
+            Table t2 = FileHandler.loadTableFromFile("./test.txt");
             t2.testCreateTable();
             t2.testGetWidthOfString();
             t2.testSetPrimaryKey();
